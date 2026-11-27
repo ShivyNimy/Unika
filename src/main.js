@@ -4,12 +4,28 @@ import './style.css';
 document.querySelector('#app').innerHTML = `
 <div class="world" id="world"></div>
 <div class="grain"></div>
-<header><div class="brand"><span class="brand-icon">✳</span><span>THE SPACE BETWEEN <small>AN INTERACTIVE SANCTUARY</small></span></div><button class="sound" id="sound" aria-label="Toggle sound"><span id="soundIcon">◖))</span><span id="soundText">SOUND OFF</span></button></header>
+<header><div class="brand"><span class="brand-icon">✳</span><span>THE SPACE BETWEEN <small>AN INTERACTIVE SANCTUARY</small></span></div><div class="header-actions"><button class="sound icon-btn" id="backBtn" aria-label="Back to the beginning" title="Back">←</button><button class="sound" id="sound" aria-label="Toggle sound"><span id="soundIcon">◖))</span><span class="txt" id="soundText">SOUND OFF</span></button><button class="sound icon-btn" id="compactToggle" aria-label="Toggle compact view" title="Compact view"><span id="compactIcon">◱</span></button><button class="sound icon-btn" id="fullToggle" aria-label="Toggle fullscreen" title="Fullscreen"><span id="fullIcon">⛶</span></button></div></header>
 <main><div class="eyebrow"><span></span> A LITTLE WORLD FOR YOU</div><h1>Take a breath.<br><em>Let yourself wander.</em></h1><p>There’s nowhere to be, and nothing to prove.<br>Just a small world waiting to be noticed.</p><button id="enter" class="enter">ENTER THE GARDEN <span>↗</span></button><div class="hint">BEST EXPERIENCED WITH SOUND <span>✳</span> MADE FOR SLOW MOMENTS</div></main>
 <div class="side-note">A QUIETER KIND OF ADVENTURE <span>01 — 03</span></div>
 <div class="bottom"><div class="bottom-left"><span class="asterisk">✳</span><div>A WORLD THAT<br><strong>GROWS WITH YOU</strong></div></div><div class="scroll">SCROLL TO EXPLORE <span>↓</span></div><div class="bottom-right">A MOMENT FOR YOURSELF <span>✺</span></div></div>
 <div class="game-ui hidden"><div class="game-top"><div><div class="eyebrow"><span></span> YOUR LITTLE SANCTUARY</div><h2>Leave a little <em>light.</em></h2><p>Collect wandering lights, then plant them<br>to make this world your own.</p></div><div class="counter"><span>✦</span><div><strong id="count">0</strong><small> LIGHTS<br> COLLECTED</small></div></div></div><div class="message" id="message">A quiet world, just for you.</div><div class="game-bottom"><div class="controls"><span><b>W A S D</b> MOVE</span><span><b>SHIFT</b> RUN</span><span><b>DRAG</b> LOOK AROUND</span><span><b>SPACE</b> PLANT A LIGHT</span></div><button id="home">← &nbsp; BACK TO THE BEGINNING</button></div></div>
-<div class="mobile-controls hidden"><button data-key="w">↑</button><div><button data-key="a">←</button><button data-key="s">↓</button><button data-key="d">→</button></div><button id="plantMobile">✦ PLANT</button></div>`;
+<div class="touch-ui hidden"><div class="stick-base" id="stick"><div class="stick-knob" id="knob"></div></div><div class="touch-actions"><button class="touch-btn" id="runBtn">RUN</button><button class="touch-btn plant" id="plantBtn">✦ PLANT</button></div></div>`;
+
+/* ------------------------------------------------------------------
+   TOUCH / MOBILE SETUP
+   Coarse pointers get the joystick + buttons; touch devices also get a
+   lighter render profile so 6 km of forest stays smooth on a phone.
+------------------------------------------------------------------- */
+const canHover = matchMedia('(hover:hover)').matches;
+const isTouch = matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints > 0;
+// "compact" = narrow column layout (phones, small windows); "compactable" = the
+// compact view can also be toggled by hand from the header button or the C key
+const prefersCompact = !canHover && !isTouch;           // honour the OS "compact" hint
+const isLandscapeAndShort = () => innerHeight < 520;
+const smallScreen = () => Math.min(innerWidth, innerHeight) <= 700 || innerWidth <= 900 || prefersCompact;
+const perf = isTouch || smallScreen()
+  ? { pixelRatio: 1.5, shadows: true, shadowMap: 1024, trees: 900, rocks: 700, flowers: 2200, islands: 22 }
+  : { pixelRatio: 2,   shadows: true, shadowMap: 2048, trees: 1400, rocks: 1100, flowers: 3600, islands: 34 };
 
 /* ------------------------------------------------------------------
    WORLD SCALE — everything below is in metres.
@@ -26,9 +42,9 @@ const SKY = 0xb6c8bb;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(SKY);
 scene.fog = new THREE.Fog(SKY, 1300, 9200);
 const camera = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, .5, 16000); camera.position.set(12,10,15);
-const renderer = new THREE.WebGLRenderer({antialias:true, alpha:false}); renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.1; world.appendChild(renderer.domElement);
+const renderer = new THREE.WebGLRenderer({antialias:!isTouch, alpha:false, powerPreference:'high-performance'}); renderer.setPixelRatio(Math.min(devicePixelRatio,perf.pixelRatio)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=perf.shadows; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.1; world.appendChild(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0xe9f2df,0x536853,2.1));
-const sun=new THREE.DirectionalLight(0xffedca,3.1); sun.position.set(-8,16,9); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); Object.assign(sun.shadow.camera,{left:-70,right:70,top:70,bottom:-70,near:1,far:640}); sun.shadow.camera.updateProjectionMatrix(); sun.shadow.normalBias=.06; sun.shadow.bias=-.0008; scene.add(sun); scene.add(sun.target);
+const sun=new THREE.DirectionalLight(0xffedca,3.1); sun.position.set(-8,16,9); sun.castShadow=true; sun.shadow.mapSize.set(perf.shadowMap,perf.shadowMap); Object.assign(sun.shadow.camera,{left:-70,right:70,top:70,bottom:-70,near:1,far:640}); sun.shadow.camera.updateProjectionMatrix(); sun.shadow.normalBias=.06; sun.shadow.bias=-.0008; scene.add(sun); scene.add(sun.target);
 const mat=(color,extra={})=>new THREE.MeshStandardMaterial({color,roughness:1,...extra});
 const grass=mat(0x799b79), darkGrass=mat(0x638465), stone=mat(0xc7c5a9), bark=mat(0x625f49), leaves=[mat(0x7e9c79),mat(0x96ad87),mat(0xb2c39b),mat(0x6e9275)];
 const leafColors=[new THREE.Color(0x7e9c79),new THREE.Color(0x96ad87),new THREE.Color(0xb2c39b),new THREE.Color(0x6e9275)];
@@ -114,7 +130,7 @@ function scatter(count,accept){
 const dummy=new THREE.Object3D();
 
 /* --- forest: ~1400 trees, instanced so 6 km of woodland stays cheap */
-const treeSpots=scatter(1400,(x,z,r)=>r>16&&groveNoise(x,z)>.02);
+const treeSpots=scatter(perf.trees,(x,z,r)=>r>16&&groveNoise(x,z)>.02);
 const trunkGeo=new THREE.CylinderGeometry(.5,1,9,6); trunkGeo.translate(0,4.5,0);
 const trunks=new THREE.InstancedMesh(trunkGeo,bark,treeSpots.length);
 const canopyGeo=new THREE.IcosahedronGeometry(1,1);
@@ -134,7 +150,7 @@ trunks.castShadow=trunks.receiveShadow=true; canopies.castShadow=true;
 scene.add(trunks,canopies);
 
 /* --- rocks and wildflowers --- */
-const rocks=scatter(1100);
+const rocks=scatter(perf.rocks);
 const rockMesh=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),stone,rocks.length);
 rocks.forEach(([x,z],i)=>{const s=1+rnd()*5,y=heightAt(x,z);
   dummy.position.set(x,y+s*.25,z);dummy.rotation.set(rnd()*3,rnd()*6.28,rnd()*3);dummy.scale.set(s,s*(.45+rnd()*.4),s*.9);dummy.updateMatrix();
@@ -142,7 +158,7 @@ rocks.forEach(([x,z],i)=>{const s=1+rnd()*5,y=heightAt(x,z);
 rockMesh.castShadow=rockMesh.receiveShadow=true; scene.add(rockMesh);
 
 const flowerMats=[mat(0xeed7b3),mat(0xe8b9ad),mat(0xf2e8cc)];
-const stems=scatter(3600,(x,z,r)=>r>8&&groveNoise(x,z)<.35);
+const stems=scatter(perf.flowers,(x,z,r)=>r>8&&groveNoise(x,z)<.35);
 const stemMesh=new THREE.InstancedMesh(new THREE.ConeGeometry(.14,.9,4),darkGrass,stems.length);
 const bloomGeo=new THREE.IcosahedronGeometry(.34,0);
 const blooms=new THREE.InstancedMesh(bloomGeo,new THREE.MeshStandardMaterial({roughness:1}),stems.length);
@@ -154,7 +170,7 @@ stems.forEach(([x,z],i)=>{const s=1.4+rnd()*2.2,y=heightAt(x,z);
 stemMesh.castShadow=true; scene.add(stemMesh,blooms);
 
 /* --- far islands drifting beyond the rim, fading into the haze ---- */
-for(let i=0;i<34;i++){
+for(let i=0;i<perf.islands;i++){
   const a=rnd()*Math.PI*2, r=ARENA_RADIUS*(1.35+rnd()*1.9), s=120+rnd()*520;
   const y=-320+rnd()*760;
   const g=new THREE.Group(); g.position.set(Math.cos(a)*r,y,Math.sin(a)*r); g.rotation.y=rnd()*6.28; scene.add(g);
@@ -177,27 +193,160 @@ function addLight(x,z){const y=heightAt(x,z);const g=new THREE.Group();g.positio
 [[-3,4],[3,3],[-4,-1],[4,-3],[0,-5],[7,1],[-6,-3]].forEach(p=>addLight(...p));
 scatter(80,(x,z,r)=>r>30).forEach(([x,z])=>addLight(x,z));
 
-let playing=false, count=0, planted=0, yaw=0, speed=0, dragging=false,lastX=0, soundOn=false, audio;const keys={};
+let pitch=0;
+let playing=false, count=0, planted=0, yaw=0, speed=0, dragging=false, lastX=0, lastY=0, soundOn=false, audio;const keys={};
+// joystick state (touch) — x/z in -1..1
+const stick={x:0,z:0,active:false,run:false,lastMag:0};
 const showMessage=(text)=>{const el=document.querySelector('#message');el.textContent=text;el.classList.add('show');clearTimeout(showMessage.timer);showMessage.timer=setTimeout(()=>el.classList.remove('show'),3000)};
-document.querySelector('#enter').onclick=()=>{playing=true;document.body.classList.add('playing');document.querySelector('.game-ui').classList.remove('hidden');document.querySelector('.mobile-controls').classList.remove('hidden');showMessage('A quiet world, six kilometres wide.');};
-document.querySelector('#home').onclick=()=>{playing=false;document.body.classList.remove('playing');document.querySelector('.game-ui').classList.add('hidden');document.querySelector('.mobile-controls').classList.add('hidden')};
-function plant(){if(!playing)return;if(count<1){showMessage('Find a wandering light first ✦');return}count--;planted++;document.querySelector('#count').textContent=count;const x=player.position.x,z=player.position.z,y=heightAt(x,z);mesh(new THREE.CylinderGeometry(.025,.04,.7,5),darkGrass,x,y+.36,z);for(let i=0;i<5;i++){let a=i*Math.PI*2/5;let petal=mesh(new THREE.SphereGeometry(.16,8,6),flowerMats[planted%3],x+Math.cos(a)*.13,y+.78,z+Math.sin(a)*.13);petal.scale.set(.8,.45,1)}mesh(new THREE.SphereGeometry(.1,8,6),glowMat,x,y+.82,z);showMessage(['Something beautiful begins here.','A little light, left behind.','The garden remembers you.'][planted%3]);}
-window.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.code==='Space'){e.preventDefault();if(!e.repeat)plant()}});window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);window.addEventListener('blur',()=>Object.keys(keys).forEach(k=>keys[k]=false));
-renderer.domElement.addEventListener('pointerdown',e=>{if(playing){dragging=true;lastX=e.clientX;renderer.domElement.setPointerCapture(e.pointerId)}});renderer.domElement.addEventListener('pointermove',e=>{if(dragging){yaw-=(e.clientX-lastX)*.006;lastX=e.clientX}});renderer.domElement.addEventListener('pointerup',()=>dragging=false);
-document.querySelectorAll('[data-key]').forEach(b=>{const k=b.dataset.key;b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;b.setPointerCapture(e.pointerId)});b.addEventListener('pointerup',()=>keys[k]=false);b.addEventListener('pointercancel',()=>keys[k]=false)});document.querySelector('#plantMobile').onclick=plant;
-document.querySelector('#sound').onclick=()=>{soundOn=!soundOn;document.querySelector('#soundText').textContent=soundOn?'SOUND ON':'SOUND OFF';document.querySelector('#soundIcon').textContent=soundOn?'◖))':'◖)';if(soundOn){if(!audio){audio=new AudioContext();const osc=audio.createOscillator(),gain=audio.createGain();osc.type='sine';osc.frequency.value=110;gain.gain.value=.025;osc.connect(gain).connect(audio.destination);osc.start()}audio.resume()}else if(audio)audio.suspend()};
-window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 
-const clock=new THREE.Clock();const tmpTarget=new THREE.Vector3(),tmpOffset=new THREE.Vector3();
+/* ---------- compact mode ---------- */
+const bodyEl=document.body;
+if(isTouch)bodyEl.classList.add('touch-mode');
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const compactBtn=document.querySelector('#compactToggle');
+let userCompact=store.get('sb-compact')===null?null:store.get('sb-compact')==='1';
+function applyCompact(){
+  const on=userCompact===null?smallScreen():userCompact;
+  bodyEl.classList.toggle('compact',on);
+  document.querySelector('#compactIcon').textContent=on?'◰':'◱';
+  compactBtn.setAttribute('aria-pressed',on?'true':'false');
+}
+function setCompact(on){userCompact=on;store.set('sb-compact',on?'1':'0');applyCompact()}
+applyCompact();
+compactBtn.onclick=()=>setCompact(!bodyEl.classList.contains('compact'));
+
+/* ---------- fullscreen (handy on phones, hides browser chrome) ---------- */
+const fullBtn=document.querySelector('#fullToggle');
+const fullEl=document.documentElement;
+const isFull=()=>document.fullscreenElement||document.webkitFullscreenElement;
+fullBtn.onclick=()=>{
+  if(isFull()){(document.exitFullscreen||document.webkitExitFullscreen).call(document)}
+  else{const p=fullEl.requestFullscreen||fullEl.webkitRequestFullscreen;if(p)p.call(fullEl).catch(()=>{})}
+};
+['fullscreenchange','webkitfullscreenchange'].forEach(ev=>document.addEventListener(ev,()=>{document.querySelector('#fullIcon').textContent=isFull()?'⤡':'⛶';onResize()}));
+
+/* ---------- enter / leave the garden ---------- */
+document.querySelector('#enter').onclick=()=>{
+  playing=true;bodyEl.classList.add('playing');
+  document.querySelector('.game-ui').classList.remove('hidden');
+  if(isTouch)document.querySelector('.touch-ui').classList.remove('hidden');
+  // phones: nudge into fullscreen so the browser bars stop eating the view
+  if(isTouch&&!isFull()){const p=fullEl.requestFullscreen||fullEl.webkitRequestFullscreen;try{if(p)p.call(fullEl).catch(()=>{})}catch(err){}}
+  showMessage(isTouch?'Drag to look. Joystick to wander.':'A quiet world, six kilometres wide.');
+};
+function goHome(){
+  playing=false;bodyEl.classList.remove('playing');stick.x=stick.z=0;stick.active=false;resetKnob();setRun(false);
+  document.querySelector('.game-ui').classList.add('hidden');
+  document.querySelector('.touch-ui').classList.add('hidden');
+}
+document.querySelector('#home').onclick=goHome;
+document.querySelector('#backBtn').onclick=goHome;
+
+/* ---------- planting ---------- */
+function plant(){if(!playing)return;if(count<1){showMessage('Find a wandering light first ✦');return}count--;planted++;document.querySelector('#count').textContent=count;const x=player.position.x,z=player.position.z,y=heightAt(x,z);mesh(new THREE.CylinderGeometry(.025,.04,.7,5),darkGrass,x,y+.36,z);for(let i=0;i<5;i++){let a=i*Math.PI*2/5;let petal=mesh(new THREE.SphereGeometry(.16,8,6),flowerMats[planted%3],x+Math.cos(a)*.13,y+.78,z+Math.sin(a)*.13);petal.scale.set(.8,.45,1)}mesh(new THREE.SphereGeometry(.1,8,6),glowMat,x,y+.82,z);if(isTouch&&navigator.vibrate)navigator.vibrate(10);showMessage(['Something beautiful begins here.','A little light, left behind.','The garden remembers you.'][planted%3]);}
+
+/* ---------- keyboard ---------- */
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='c'&&!e.metaKey&&!e.ctrlKey){setCompact(!bodyEl.classList.contains('compact'));return}
+  keys[k]=true;
+  if(e.code==='Space'){e.preventDefault();if(!e.repeat)plant()}
+  if(k.startsWith('arrow')||e.code==='Space')e.preventDefault();
+});
+window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+window.addEventListener('blur',()=>{Object.keys(keys).forEach(k=>keys[k]=false);stick.x=stick.z=0;stick.active=false;resetKnob()});
+
+/* ---------- drag to look (mouse + touch) ---------- */
+const canvas=renderer.domElement;
+let lookId=null;
+canvas.addEventListener('pointerdown',e=>{
+  if(!playing||e.pointerType==='mouse'&&e.button!==0)return;
+  if(lookId!==null)return;
+  lookId=e.pointerId;dragging=true;lastX=e.clientX;lastY=e.clientY;
+  try{canvas.setPointerCapture(e.pointerId)}catch(err){}
+});
+canvas.addEventListener('pointermove',e=>{
+  if(!dragging||e.pointerId!==lookId)return;
+  yaw-=(e.clientX-lastX)*(isTouch?.005:.006);
+  // touch devices can also nudge the camera height by dragging vertically
+  if(isTouch){pitch=Math.min(.55,Math.max(-.2,pitch+(e.clientY-lastY)*.0025))}
+  lastX=e.clientX;lastY=e.clientY;
+});
+const endLook=e=>{if(e.pointerId===lookId){lookId=null;dragging=false}};
+canvas.addEventListener('pointerup',endLook);
+canvas.addEventListener('pointercancel',endLook);
+// pinch/double-tap zoom and rubber-band scrolling shouldn't fight the game
+canvas.addEventListener('gesturestart',e=>e.preventDefault());
+canvas.addEventListener('touchmove',e=>{if(playing)e.preventDefault()},{passive:false});
+
+/* ---------- virtual joystick ---------- */
+const stickEl=document.querySelector('#stick'),knob=document.querySelector('#knob');
+let stickId=null;
+function resetKnob(){if(knob)knob.style.transform='translate(0px,0px)'}
+function moveKnob(dx,dy){const max=44;const d=Math.hypot(dx,dy)||1;const k=Math.min(1,max/d);knob.style.transform=`translate(${dx*k}px,${dy*k}px)`}
+stickEl.addEventListener('pointerdown',e=>{
+  e.preventDefault();stickId=e.pointerId;stick.active=true;
+  try{stickEl.setPointerCapture(e.pointerId)}catch(err){}
+  stickCenter();updateStick(e);
+});
+stickEl.addEventListener('pointermove',e=>{if(e.pointerId===stickId)updateStick(e)});
+const endStick=e=>{if(e.pointerId===stickId){stick.lastMag=Math.hypot(stick.x,stick.z);stickId=null;stick.active=false;stick.x=stick.z=0;resetKnob()}};
+stickEl.addEventListener('pointerup',endStick);
+stickEl.addEventListener('pointercancel',endStick);
+let scx=0,scy=0;
+function stickCenter(){const r=stickEl.getBoundingClientRect();scx=r.left+r.width/2;scy=r.top+r.height/2}
+function updateStick(e){
+  const dx=e.clientX-scx,dy=e.clientY-scy,max=52;
+  moveKnob(dx,dy);
+  stick.x=Math.max(-1,Math.min(1,dx/max));
+  stick.z=Math.max(-1,Math.min(1,dy/max));
+}
+const runBtn=document.querySelector('#runBtn');
+const setRun=on=>{stick.run=on;runBtn.classList.toggle('active',on)};
+runBtn.addEventListener('pointerdown',e=>{e.preventDefault();setRun(!stick.run)});
+document.querySelector('#plantBtn').addEventListener('pointerdown',e=>{e.preventDefault();plant()});
+// double-tap the joystick knob to toggle run, too
+let lastStickTap=0;
+stickEl.addEventListener('pointerup',e=>{
+  if(e.pointerType==='mouse')return;
+  const now=performance.now();
+  if(now-lastStickTap<320&&stick.lastMag<.3){setRun(!stick.run)}
+  lastStickTap=now;
+});
+
+/* ---------- sound ---------- */
+document.querySelector('#sound').onclick=()=>{soundOn=!soundOn;document.querySelector('#soundText').textContent=soundOn?'SOUND ON':'SOUND OFF';document.querySelector('#soundIcon').textContent=soundOn?'◖))':'◖)';document.querySelector('#sound').classList.toggle('is-on',soundOn);if(soundOn){if(!audio){audio=new (window.AudioContext||window.webkitAudioContext)();const osc=audio.createOscillator(),gain=audio.createGain();osc.type='sine';osc.frequency.value=110;gain.gain.value=.025;osc.connect(gain).connect(audio.destination);osc.start()}audio.resume()}else if(audio)audio.suspend()};
+
+/* ---------- resize / orientation / visibility ---------- */
+function onResize(){
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(devicePixelRatio,perf.pixelRatio));
+  renderer.setSize(innerWidth,innerHeight);
+  applyCompact();
+  if(stick.active)stickCenter();
+}
+window.addEventListener('resize',onResize);
+window.addEventListener('orientationchange',()=>setTimeout(onResize,250));
+// pause the render loop when the tab/app is hidden — saves phone battery
+let visible=true;
+document.addEventListener('visibilitychange',()=>{visible=!document.hidden});
+onResize();
+
+const clock=new THREE.Clock();const tmpTarget=new THREE.Vector3(),tmpOffset=new THREE.Vector3(),scratch=new THREE.Vector3(),landPos=new THREE.Vector3(12,10,15),moveDir=new THREE.Vector3();
 function animate(){
   requestAnimationFrame(animate);
   const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+  if(!visible){renderer.render(scene,camera);return}
   if(playing){
-    const dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dz=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
-    const want=(dx||dz)?(keys.shift?SPRINT_SPEED:WALK_SPEED):0;
+    let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
+    let dz=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
+    if(stick.active){dx+=stick.x;dz+=stick.z}
+    dx=Math.max(-1,Math.min(1,dx));dz=Math.max(-1,Math.min(1,dz));
+    const running=keys.shift||stick.run;
+    const want=(dx||dz)?(running?SPRINT_SPEED:WALK_SPEED):0;
     speed+=(want-speed)*Math.min(1,dt*4.5);
     if((dx||dz)&&speed>0.5){
-      const dir=new THREE.Vector3(dx,0,dz).normalize().applyAxisAngle(UP,yaw);
+      const dir=moveDir.set(dx,0,dz).normalize().applyAxisAngle(UP,yaw);
       const nx=player.position.x+dir.x*speed*dt, nz=player.position.z+dir.z*speed*dt;
       if(Math.hypot(nx,nz)<EDGE_LIMIT){player.position.x=nx;player.position.z=nz}
       player.rotation.y=Math.atan2(dir.x,dir.z);
@@ -206,8 +355,10 @@ function animate(){
     body.position.y=.7+Math.abs(Math.sin(t*(9+speed*.12)))*.08;
     // camera pulls back as you gather speed, so the world never blurs past you
     tmpTarget.set(player.position.x,player.position.y+1.4,player.position.z);
-    tmpOffset.set(0,9+speed*.05,13+speed*.08).applyAxisAngle(UP,yaw);
-    camera.position.lerp(tmpTarget.clone().add(tmpOffset),1-Math.exp(-dt*3.6));
+    const aspect=innerWidth/innerHeight;
+    const distMul=aspect<1?1+(1-aspect)*.55:(aspect>2?Math.min(1.25,aspect*.62):1);
+    tmpOffset.set(0,9+speed*.05+(pitch*26),13+speed*.08).multiplyScalar(distMul).applyAxisAngle(UP,yaw);
+    camera.position.lerp(scratch.copy(tmpTarget).add(tmpOffset),1-Math.exp(-dt*3.6));
     camera.lookAt(tmpTarget);
     // the sun's shadow frustum travels with you
     sun.position.set(player.position.x-90,240,player.position.z+120);
@@ -215,9 +366,9 @@ function animate(){
     sun.target.updateMatrixWorld();
     for(let i=lights.length-1;i>=0;i--){const l=lights[i];
       l.g.position.y=l.baseY+Math.sin(t*2+l.phase)*.25;l.g.rotation.y+=dt;
-      if(Math.hypot(player.position.x-l.x,player.position.z-l.z)<9){scene.remove(l.g);lights.splice(i,1);count++;document.querySelector('#count').textContent=count;showMessage('You found a little light ✦')}}
+      if(Math.hypot(player.position.x-l.x,player.position.z-l.z)<9){scene.remove(l.g);lights.splice(i,1);count++;document.querySelector('#count').textContent=count;if(isTouch&&navigator.vibrate)navigator.vibrate([6,40,8]);showMessage('You found a little light ✦')}}
   }else{
-    camera.position.lerp(new THREE.Vector3(12+Math.sin(t*.1)*1.5,10,15),.02);camera.lookAt(0,2,0);
+    landPos.set(12+Math.sin(t*.1)*1.5,10,15);camera.position.lerp(landPos,.02);camera.lookAt(0,2,0);
     sun.position.set(-90,240,120); sun.target.position.set(0,0,0); sun.target.updateMatrixWorld();
     lights.forEach(l=>{l.g.position.y=l.baseY+Math.sin(t*2+l.phase)*.25;l.g.rotation.y+=dt});
   }
